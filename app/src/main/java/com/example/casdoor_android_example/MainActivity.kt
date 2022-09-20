@@ -3,9 +3,11 @@ package com.example.casdoor_android_example
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.view.View
 import android.widget.Button
 import android.widget.TextView
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import org.casdoor.Casdoor
 import org.casdoor.CasdoorConfig
 
@@ -26,43 +28,33 @@ class MainActivity : AppCompatActivity() {
             redirectUri = "casdoor://callback",
             appName = "app-casnode"
         )
-         casdoor = Casdoor(casdoorConfig)
-        next.setOnClickListener(object : View.OnClickListener {
-            override fun onClick(v: View?) {
-
-                try {
-                    val intent = Intent(this@MainActivity, WebViewActivity::class.java)
-                    intent.putExtra("url", casdoor?.getSignInUrl());
-                    startActivityForResult(intent, 10001)
-                } catch (e: Exception) {
-                    println("The current phone does not have a browser installed")
-                }
-
-            }
-        })
+        casdoor = Casdoor(casdoorConfig)
+        val resultLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+            launcherCallback
+        )
+        next.setOnClickListener {
+            val intent = Intent(this@MainActivity, WebViewActivity::class.java)
+            intent.putExtra("url", casdoor?.getSignInUrl());
+            resultLauncher.launch(intent)
+        }
 
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode == RESULT_OK && requestCode == 10001) {
+    private val launcherCallback = ActivityResultCallback<ActivityResult> { result ->
+        val data = result.data
+        if (result.resultCode == RESULT_OK) {
             val code = data?.getStringExtra("code")
             info?.text = code
-            Thread(object : Runnable {
-                override fun run() {
-
-                    code?.let {
-                        val token = casdoor?.requestOauthAccessToken(code)
-                     runOnUiThread(object :Runnable{
-                         override fun run() {
-                             info?.text = token.toString()
-                         }
-
-                     })
-                    }
+            Thread {
+                code?.let {
+                    val token = casdoor?.requestOauthAccessToken(code)
+                    runOnUiThread { info?.text = token.toString() }
                 }
-            }).start()
+            }.start()
 
         }
     }
+
+
 }

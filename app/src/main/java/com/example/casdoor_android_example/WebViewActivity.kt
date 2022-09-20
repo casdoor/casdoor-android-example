@@ -9,14 +9,14 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 
-class WebViewActivity  : AppCompatActivity() {
+class WebViewActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_web)
         val webview = findViewById<WebView>(R.id.webview)
-        WebviewUtils.loadWebView(webview,this)
+        WebviewUtils.loadWebView(webview)
 
-        webview.webViewClient=object : WebViewClient() {
+        webview.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(
                 view: WebView?,
                 request: WebResourceRequest?
@@ -24,8 +24,8 @@ class WebViewActivity  : AppCompatActivity() {
                 val url = request?.url.toString()
                 val uri = Uri.parse(url)
                 val code: String? = uri.getQueryParameter("code")
-                if (!TextUtils.isEmpty(code)){
-                    setResult(RESULT_OK, Intent().putExtra("code",code))
+                if (!TextUtils.isEmpty(code)) {
+                    setResult(RESULT_OK, Intent().putExtra("code", code))
                     finish()
                     return true
                 }
