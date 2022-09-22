@@ -20,7 +20,7 @@
     <Button
         android:id="@+id/start"
         android:layout_width="match_parent"
-        android:layout_height="60dp">
-    </Button>
+        android:layout_height="60dp"
+        android:textAllCaps="false"></Button>
 
 </LinearLayout>
