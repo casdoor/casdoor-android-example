@@ -36,6 +36,7 @@ class MainActivity : AppCompatActivity() {
 
         info = findViewById<TextView>(R.id.info)
         val next = findViewById<Button>(R.id.start)
+        next.text = "Click me"
 
         val casdoorConfig = CasdoorConfig(
             endpoint = "https://door.casdoor.com",
