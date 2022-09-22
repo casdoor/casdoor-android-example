@@ -39,14 +39,17 @@ class WebViewActivity : AppCompatActivity() {
             ): Boolean {
                 val url = request?.url.toString()
                 val uri = Uri.parse(url)
-                val code: String? = uri.getQueryParameter("code")
-                if (!TextUtils.isEmpty(code)) {
-                    setResult(RESULT_OK, Intent().putExtra("code", code))
-                    finish()
-                    return true
+                if(uri.scheme.toString() == "casdoor"){
+                    val code: String? = uri.getQueryParameter("code")
+                    if (!TextUtils.isEmpty(code)) {
+                        setResult(RESULT_OK, Intent().putExtra("code", code))
+                        finish()
+                        return true
+                    }
                 }
                 return super.shouldOverrideUrlLoading(view, request)
             }
+
         }
         intent.getStringExtra("url")?.let { webview.loadUrl(it) }
     }
