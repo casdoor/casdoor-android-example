@@ -18,5 +18,5 @@ dependencyResolutionManagement {
         maven { url 'https://www.jitpack.io' }
     }
 }
-rootProject.name = "casdoor2"
+rootProject.name = "casdoor"
 include ':app'
