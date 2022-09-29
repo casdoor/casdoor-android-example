@@ -39,7 +39,7 @@ class WebViewActivity : AppCompatActivity() {
             ): Boolean {
                 val url = request?.url.toString()
                 val uri = Uri.parse(url)
-                if(uri.scheme.toString() == "casdoor"){
+                if (uri.scheme.toString() == "casdoor") {
                     val code: String? = uri.getQueryParameter("code")
                     if (!TextUtils.isEmpty(code)) {
                         setResult(RESULT_OK, Intent().putExtra("code", code))

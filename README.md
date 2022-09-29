@@ -18,7 +18,7 @@ Initialization requires 6 parameters, which are all str type:
 | endpoint  | Yes | Casdoor Server Url, such as `door.casdoor.com` |
 | organizationName  | Yes | Organization name |
 | appName  | Yes | Application name |
-| redirectUri  | Yes | URI of Web redirection |
+| redirectUri  | Yes | The path of the callback URL for your Casdoor application, will be `casdoor://callback` if not provided |
 
 ```
  val casdoorConfig = CasdoorConfig(
