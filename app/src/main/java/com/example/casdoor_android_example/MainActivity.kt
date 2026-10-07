@@ -19,98 +19,123 @@ package com.example.casdoor_android_example
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
-import androidx.activity.result.ActivityResult
-import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import kotlinx.android.synthetic.main.activity_main.*
+import androidx.lifecycle.lifecycleScope
+import com.example.casdoor_android_example.databinding.ActivityMainBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.casdoor.Casdoor
 import org.casdoor.CasdoorConfig
+import java.io.IOException
+import java.security.SecureRandom
 
 class MainActivity : AppCompatActivity() {
 
-    private var casdoor: Casdoor? = null
-    private var isLogin = false
-    private var acToken = ""
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        val casdoorConfig = CasdoorConfig(
+    // The Casdoor application to sign in with, the defaults are the public demo server https://door.casdoor.com
+    private val casdoor = Casdoor(
+        CasdoorConfig(
             endpoint = "https://door.casdoor.com",
             clientID = "014ae4bd048734ca2dea",
             organizationName = "casbin",
-            redirectUri = "casdoor://callback",
+            // must be in the Redirect URLs of the application, WebViewActivity catches it
+            redirectUri = REDIRECT_URI,
             appName = "app-casnode"
         )
-        casdoor = Casdoor(casdoorConfig)
-        val resultLauncher = registerForActivityResult(
-            ActivityResultContracts.StartActivityForResult(),
-            launcherCallback
-        )
-        tv_login.setOnClickListener {
-            if (!isLogin) {
-                val intent = Intent(this@MainActivity, WebViewActivity::class.java)
-                intent.putExtra("url", casdoor?.getSignInUrl(scope = "profile"));
-                resultLauncher.launch(intent)
-            } else {
-                pb_progress.visibility = View.VISIBLE
-                Thread {
-                    try {
-                        val logout = casdoor?.logout(acToken, null)
-                        if (logout == true) {
-                            runOnUiThread {
-                                tv_name.text = ""
-                                tv_name.visibility = View.GONE
-                                isLogin = false
-                                tv_login.text = "Login with Casdoor"
-                                pb_progress.visibility = View.GONE
-                            }
-                        }
-                    } catch (e: Exception) {
-                        runOnUiThread {
-                            pb_progress.visibility = View.GONE
-                            tv_name?.text = e.message
-                        }
-                    }
-                }.start()
+    )
+
+    private lateinit var binding: ActivityMainBinding
+    private var accessToken: String? = null
+
+    // WebViewActivity returns the code that Casdoor redirected back with
+    private val signInLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val data = result.data
+            if (result.resultCode == RESULT_OK && data != null) {
+                val code = data.getStringExtra(WebViewActivity.EXTRA_CODE)
+                if (code != null) {
+                    signIn(code)
+                } else {
+                    showSignedOut(data.getStringExtra(WebViewActivity.EXTRA_ERROR))
+                }
             }
         }
 
-    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-    private val launcherCallback = ActivityResultCallback<ActivityResult> { result ->
-        val data = result.data
-        if (result.resultCode == RESULT_OK) {
-            val code = data?.getStringExtra("code")
-            pb_progress.visibility = View.VISIBLE
-            Thread {
-                runOnUiThread {
-                    tv_name?.text = "Loading..."
-                }
-                code?.let {
-                    try {
-                        acToken = casdoor?.requestOauthAccessToken(code)?.accessToken.toString()
-                        val userData = casdoor?.getUserInfo(acToken)
-                        runOnUiThread {
-                            tv_name.text = userData?.name
-                            tv_name.visibility = View.VISIBLE
-                            isLogin = true
-                            tv_login.text = "Logout"
-                            pb_progress.visibility = View.GONE
-                        }
-                    } catch (e: Exception) {
-                        runOnUiThread {
-                            pb_progress.visibility = View.GONE
-                            tv_name?.text = e.message
-                        }
-                    }
-                }
-            }.start()
-
+        binding.tvLogin.setOnClickListener {
+            if (accessToken == null) {
+                openSignInPage()
+            } else {
+                signOut()
+            }
         }
     }
 
+    private fun openSignInPage() {
+        // getSignInUrl() starts a new PKCE flow: only this Casdoor instance knows the code verifier.
+        // The random state ties the redirect to this sign-in.
+        val state = randomState()
+        val intent = Intent(this, WebViewActivity::class.java)
+            .putExtra(WebViewActivity.EXTRA_URL, casdoor.getSignInUrl(scope = "profile", state = state))
+            .putExtra(WebViewActivity.EXTRA_REDIRECT_URI, REDIRECT_URI)
+            .putExtra(WebViewActivity.EXTRA_STATE, state)
+        signInLauncher.launch(intent)
+    }
 
+    private fun signIn(code: String) {
+        binding.pbProgress.visibility = View.VISIBLE
+        lifecycleScope.launch {
+            try {
+                // the SDK makes blocking network calls
+                val (token, user) = withContext(Dispatchers.IO) {
+                    val token = casdoor.requestOauthAccessToken(code).accessToken
+                        ?: throw IOException("No access token in the response")
+                    token to casdoor.getUserInfo(token)
+                }
+                accessToken = token
+                binding.tvName.text = getString(R.string.username, user?.name)
+                binding.tvName.visibility = View.VISIBLE
+                binding.tvLogin.setText(R.string.logout)
+            } catch (e: Exception) {
+                showSignedOut(e.message)
+            }
+            binding.pbProgress.visibility = View.GONE
+        }
+    }
+
+    private fun signOut() {
+        val token = accessToken ?: return
+        binding.pbProgress.visibility = View.VISIBLE
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) { casdoor.logout(token) }
+            } catch (e: Exception) {
+                // the Casdoor session may already have ended
+            }
+            showSignedOut(null)
+            binding.pbProgress.visibility = View.GONE
+        }
+    }
+
+    private fun showSignedOut(error: String?) {
+        accessToken = null
+        binding.tvName.text = error
+        binding.tvName.visibility = if (error == null) View.GONE else View.VISIBLE
+        binding.tvLogin.setText(R.string.login)
+    }
+
+    private fun randomState(): String {
+        val bytes = ByteArray(16)
+        SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    companion object {
+        private const val REDIRECT_URI = "casdoor://callback"
+    }
 }

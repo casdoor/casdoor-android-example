@@ -16,41 +16,67 @@
 
 package com.example.casdoor_android_example
 
+import android.annotation.SuppressLint
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
-import android.text.TextUtils
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
+import com.example.casdoor_android_example.databinding.ActivityWebBinding
 
+/**
+ * Shows the Casdoor sign-in page and catches the redirect to the redirect URI,
+ * which carries the authorization code.
+ */
 class WebViewActivity : AppCompatActivity() {
+
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_web)
-        val webview = findViewById<WebView>(R.id.webview)
-        WebviewUtils.loadWebView(webview)
+        val binding = ActivityWebBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        webview.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(
-                view: WebView?,
-                request: WebResourceRequest?
-            ): Boolean {
-                val url = request?.url.toString()
-                val uri = Uri.parse(url)
-                if (uri.scheme.toString() == "casdoor") {
-                    val code: String? = uri.getQueryParameter("code")
-                    if (!TextUtils.isEmpty(code)) {
-                        setResult(RESULT_OK, Intent().putExtra("code", code))
-                        finish()
-                        return true
-                    }
+        val redirectUri = intent.getStringExtra(EXTRA_REDIRECT_URI).orEmpty()
+        val state = intent.getStringExtra(EXTRA_STATE)
+
+        // the Casdoor web UI needs JavaScript and DOM storage
+        binding.webview.settings.javaScriptEnabled = true
+        binding.webview.settings.domStorageEnabled = true
+        // always ask for the account, instead of reusing the last Casdoor session of the WebView
+        CookieManager.getInstance().removeAllCookies(null)
+
+        binding.webview.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val uri = request.url
+                if (!uri.toString().startsWith(redirectUri)) {
+                    return false
                 }
-                return super.shouldOverrideUrlLoading(view, request)
-            }
 
+                val result = Intent()
+                val error = uri.getQueryParameter("error")
+                val code = uri.getQueryParameter("code")
+                when {
+                    error != null ->
+                        result.putExtra(EXTRA_ERROR, uri.getQueryParameter("error_description") ?: error)
+                    uri.getQueryParameter("state") != state || code.isNullOrEmpty() ->
+                        result.putExtra(EXTRA_ERROR, "Invalid state or code, please sign in again")
+                    else -> result.putExtra(EXTRA_CODE, code)
+                }
+                setResult(RESULT_OK, result)
+                finish()
+                return true
+            }
         }
-        intent.getStringExtra("url")?.let { webview.loadUrl(it) }
+        intent.getStringExtra(EXTRA_URL)?.let { binding.webview.loadUrl(it) }
+    }
+
+    companion object {
+        const val EXTRA_URL = "url"
+        const val EXTRA_REDIRECT_URI = "redirectUri"
+        const val EXTRA_STATE = "state"
+        const val EXTRA_CODE = "code"
+        const val EXTRA_ERROR = "error"
     }
 }

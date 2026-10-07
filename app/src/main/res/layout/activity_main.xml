@@ -19,7 +19,7 @@
             android:layout_height="wrap_content"
             android:paddingBottom="5dp"
             android:textColor="@color/black_85"
-            android:textSize="20dp"
+            android:textSize="20sp"
             android:visibility="gone"
             tools:text="Username:admin" />
 
@@ -29,10 +29,10 @@
             android:layout_height="wrap_content"
 
             android:background="@drawable/shape_login_bg"
-            android:padding="5dp"
-            android:text="Login with Casdoor"
+            android:padding="8dp"
+            android:text="@string/login"
             android:textColor="@color/black_85"
-            android:textSize="15dp" />
+            android:textSize="15sp" />
     </LinearLayout>
     <ProgressBar
         android:id="@+id/pb_progress"
